@@ -1,25 +1,34 @@
 import type { LngLatBoundsLike } from 'maplibre-gl';
+import type { Tool, Context } from "@ag-ui/client";
 import { getGlobe } from './globe';
 
-class AgUiToolCollection {
-  private toolStaticDescription: Map<string, any>;
-  private toolCallbacks: Map<string, (args: any) => Promise<any>>;
+type ToolHandler = (args: any) => Promise<unknown>;
+type ContextHandler = () => string |Promise<string>;
+
+class AgUiCapabilities {
+  private toolStaticDescription: Map<string, Tool>;
+  private toolCallbacks: Map<string, ToolHandler>;
+  private contextEntries: { description: string; callback: ContextHandler }[] = [];
 
   constructor() {
     this.toolStaticDescription = new Map();
     this.toolCallbacks = new Map();
+    this.contextEntries = [];
   }
 
-  registerTool(description: any, callback: (args: any) => Promise<any>) {
+  addTool<TArgs>(
+    description: Tool,
+    callback: (args: TArgs) => Promise<unknown>,
+  ) {
     this.toolStaticDescription.set(description.name, description);
-    this.toolCallbacks.set(description.name, callback);
+    this.toolCallbacks.set(description.name, callback as ToolHandler);
   }
 
-  getToolDescriptions() {
+  getToolDescriptions(): Tool[] {
     return Array.from(this.toolStaticDescription.values());
   }
 
-  async callTool(toolCallName: string, toolCallArgs: Record<string, any>): Promise<any> {
+  async callTool(toolCallName: string, toolCallArgs: Record<string, unknown>): Promise<unknown> {
     if (!this.toolCallbacks.has(toolCallName)) {
       return {
         success: false,
@@ -37,14 +46,33 @@ class AgUiToolCollection {
       };
     }
   }
+
+  addContextEntry(description: string, callback: ContextHandler) {
+    this.contextEntries.push({ description, callback });
+  }
+
+
+  async generateContext(): Promise<Context[]> {
+    const context: Context[] = [];
+    for (const entry of this.contextEntries) {
+      try {
+        const value = await entry.callback();
+        context.push({ description: entry.description, value });
+      } catch (error) {
+        console.error("Error generating context entry:", error);
+      }
+    }
+    return context;
+  }
+
 }
 
 
-export const agUiToolCollection = new AgUiToolCollection();
+export const agUiToolCollection = new AgUiCapabilities();
 const globe = getGlobe();
 
 
-agUiToolCollection.registerTool(
+agUiToolCollection.addTool(
   {
     name: "frameMapOnBoundingBox",
     description: "Frame the map view on a geographical bounding box of the form [minLongitude, minLatitude, maxLongitude, maxLatitude] in WGS84 coordinates.",
@@ -118,7 +146,7 @@ agUiToolCollection.registerTool(
 
 
 
-agUiToolCollection.registerTool(
+agUiToolCollection.addTool(
   {
     name: "animateMap",
     description: "Animate the map to a specific configuration, including position, zoom level, pitch, and bearing. The position is specified as WGS84 coordinates ordered as [longitude, latitude].",
@@ -197,7 +225,7 @@ agUiToolCollection.registerTool(
 );  
 
 
-agUiToolCollection.registerTool(
+agUiToolCollection.addTool(
   {
     name: "getElevationAtMapCenter",
     description:
@@ -221,7 +249,7 @@ agUiToolCollection.registerTool(
 );
 
 
-agUiToolCollection.registerTool(
+agUiToolCollection.addTool(
   {
     name: "getMapLayerList",
     description:
@@ -238,7 +266,7 @@ agUiToolCollection.registerTool(
 );
 
 
-agUiToolCollection.registerTool(
+agUiToolCollection.addTool(
   {
     name: "hideMapLayer",
     description: "Hides a map layer specified by its ID.",
@@ -268,7 +296,7 @@ agUiToolCollection.registerTool(
 );
 
 
-agUiToolCollection.registerTool(
+agUiToolCollection.addTool(
   {
     name: "showMapLayer",
     description: "Shows a map layer specified by its ID.",
@@ -298,7 +326,7 @@ agUiToolCollection.registerTool(
 );
 
 
-agUiToolCollection.registerTool(
+agUiToolCollection.addTool(
   {
     name: "setTerrainExaggeration",
     description: "Sets the terrain exaggeration factor.",
@@ -330,7 +358,7 @@ agUiToolCollection.registerTool(
 );
 
 
-agUiToolCollection.registerTool(
+agUiToolCollection.addTool(
   {
     name: "getTerrainExaggeration",
     description:
@@ -353,7 +381,7 @@ agUiToolCollection.registerTool(
 );
 
 
-agUiToolCollection.registerTool(
+agUiToolCollection.addTool(
   {
     name: "isTerrainActivated",
     description:
@@ -374,7 +402,7 @@ agUiToolCollection.registerTool(
 );
 
 
-agUiToolCollection.registerTool(
+agUiToolCollection.addTool(
   {
     name: "getUserPosition",
     description: "Gets the user's current position as { longitude: number, latitude: number } in WGS84.",
@@ -400,7 +428,7 @@ agUiToolCollection.registerTool(
 );
 
 
-agUiToolCollection.registerTool(
+agUiToolCollection.addTool(
   {
     name: "getVisiblePois",
     description: "Gets the currently visible points of interest (POIs) on the map. The POI layer is only visible beyond a certain zoom level, so this tool will return an empty array if the map is zoomed out too far.",
@@ -417,4 +445,44 @@ agUiToolCollection.registerTool(
     console.log("Visible POIs:", features);
     return { success: true, pois: features };
   }
+);
+
+
+
+agUiToolCollection.addContextEntry(
+  "Current visible map extent as a WGS84 bbox ordered [west, south, east, north].",
+  () => {
+    const bounds = globe.getBounds();
+    return JSON.stringify([
+      bounds.getWest(),
+      bounds.getSouth(),
+      bounds.getEast(),
+      bounds.getNorth(),
+    ]);
+  }
+);
+
+agUiToolCollection.addContextEntry(
+  "Current map zoom level.",
+  () => globe.getZoom().toString()
+);
+
+agUiToolCollection.addContextEntry(
+  "Current map center as a WGS84 coordinate ordered [longitude, latitude].",
+  () => JSON.stringify([globe.getCenter().lng, globe.getCenter().lat])
+);
+
+agUiToolCollection.addContextEntry(
+  "Current map pitch in degrees. The pitch is the angle of the camera relative to the plane of the map, where 0 degrees is looking straight down at the map and 90 degrees is looking at the horizon.",
+  () => globe.getPitch().toString()
+);
+
+agUiToolCollection.addContextEntry(
+  "Current map bearing in degrees. The bearing is the compass direction that the top of the map is facing, where 0 degrees is north, 90 degrees is east, 180 degrees is south, and 270 degrees is west.",
+  () => globe.getBearing().toString()
+);
+
+agUiToolCollection.addContextEntry(
+  "Current map terrain exaggeration. The terrain exaggeration is the factor by which the elevation of the terrain is multiplied, where 0 means a flat terrain, 1 is no exaggeration, 2 is double the elevation, and 0.5 is half the elevation.",
+  () => globe.getTerrain()?.exaggeration?.toString() ?? "0"
 );

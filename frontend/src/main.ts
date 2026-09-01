@@ -1,13 +1,11 @@
-import { getGlobe } from './globe';
 import './style.css'
 import { HttpAgent } from "@ag-ui/client";
+import type { ToolMessage } from "@ag-ui/client";
 import { marked } from 'marked';
-import { agUiToolCollection } from './agui-tools';
-import { generateAgUiContext } from './agui-context';
+import { agUiToolCollection } from './AgUiCapabilities';
 
-const globe = getGlobe();
 
-const MAX_AGENT_ROUNDS = 8;
+const MAX_AGENT_ROUNDS = 10;
 
 const agent = new HttpAgent({
   url: "http://localhost:8000/agent",
@@ -56,17 +54,12 @@ button.addEventListener(
     try {
       for (let round = 0; round < MAX_AGENT_ROUNDS; round += 1) {
         console.log("agent round", round + 1);
-        const toolResults: Array<{
-          id: string;
-          role: "tool";
-          toolCallId: string;
-          content: string;
-        }> = [];
+        const toolResults: ToolMessage[] = [];
 
         await agent.runAgent(
           {
             tools: agUiToolCollection.getToolDescriptions(),
-            context: generateAgUiContext(),
+            context: await agUiToolCollection.generateContext(),
           },
           {
             async onTextMessageContentEvent({ event }) {
