@@ -2,9 +2,15 @@ import './style.css'
 import { HttpAgent } from "@ag-ui/client";
 import type { ToolMessage } from "@ag-ui/client";
 import { marked } from 'marked';
-import { agUiToolCollection } from './AgUiCapabilities';
+import { createAgUiGlobeCapabilities } from './globe-capabilities';
 
+const globeCapabilities = createAgUiGlobeCapabilities();
 
+/**
+ * Number of rounds the agent can do from a single prompt,
+ * as a prompt can possible require multiple calls to AG-UI tools
+ * to perform the required task.
+ */
 const MAX_AGENT_ROUNDS = 10;
 
 const agent = new HttpAgent({
@@ -32,8 +38,7 @@ const responseElement =
 button.addEventListener(
   "click",
   async () => {
-    const content =
-      input.value.trim();
+    const content = input.value.trim();
 
     if (!content) {
       return;
@@ -58,8 +63,8 @@ button.addEventListener(
 
         await agent.runAgent(
           {
-            tools: agUiToolCollection.getToolDescriptions(),
-            context: await agUiToolCollection.generateContext(),
+            tools: globeCapabilities.getToolDescriptions(),
+            context: await globeCapabilities.generateContext(),
           },
           {
             async onTextMessageContentEvent({ event }) {
@@ -69,7 +74,7 @@ button.addEventListener(
             },
 
             async onToolCallEndEvent({ event, toolCallName, toolCallArgs }) {
-              let result = await agUiToolCollection.callTool(toolCallName, toolCallArgs);
+              let result = await globeCapabilities.callTool(toolCallName, toolCallArgs);
 
               toolResults.push({
                 id: crypto.randomUUID(),
