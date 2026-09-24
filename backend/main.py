@@ -49,7 +49,8 @@ async def chat_node(state: AgentState):
     # while pointing it at OpenRouter's endpoint and using an OpenRouter model
     # slug. OPENROUTER_MODEL is optional and makes switching models painless.
     model = ChatOpenAI(
-        model=os.getenv("OPENROUTER_MODEL", "openai/gpt-5.1"),
+        # model=os.getenv("OPENROUTER_MODEL", "openai/gpt-5.1"),
+        model="nvidia/nemotron-3.5-lightning",
         api_key=os.environ["OPENROUTER_API_KEY"],
         base_url="https://openrouter.ai/api/v1",
         default_headers={
@@ -132,9 +133,7 @@ app = FastAPI()
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[
-        "http://localhost:5173",
-    ],
+    allow_origin_regex=r"https?://localhost(?::[0-9]+)?",
     allow_methods=["*"],
     allow_headers=["*"],
 )

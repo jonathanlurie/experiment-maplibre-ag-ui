@@ -1,6 +1,6 @@
 import './style.css'
 import { HttpAgent } from "@ag-ui/client";
-import type { ToolMessage } from "@ag-ui/client";
+import type { ToolMessage, AgentSubscriber, AgentSubscriberParams } from "@ag-ui/client";
 import { marked } from 'marked';
 import { createAgUiGlobeCapabilities } from './globe-capabilities';
 
@@ -18,6 +18,60 @@ const agent = new HttpAgent({
   agentId: "map-agent",
   threadId: crypto.randomUUID(),
 });
+
+console.log("HttpAgent initialized:", agent);
+
+
+const subscriber: AgentSubscriber = {
+  // Called whenever the agent produces new text content, called incrementally as the content is generated.
+  onTextMessageContentEvent: (args) => {
+    console.log("onTextMessageContentEvent:", args)
+  },
+
+  onTextMessageStartEvent: (args) => {
+    console.log("onTextMessageStartEvent:", args)
+  },
+
+  onTextMessageEndEvent: (args) => {
+    console.log("onTextMessageEndEvent:", args)
+  },
+
+  onRunFailed: ( args ) => {
+    console.error("onRunFailed:", args);
+  },
+
+  // Called when the agent run completes, regardless of success or failure.
+  onRunFinalized(params) {
+    console.log("onRunFinalized:", params);
+  },
+
+  // Called when the agent run is first initialized, before any processing begins.
+  onRunInitialized(params) {
+    console.log("onRunInitialized:", params);
+  },
+
+  onRunStartedEvent(params) {
+    console.log("onRunStartedEvent:", params);
+  },
+
+  onRunFinishedEvent(params) {
+    console.log("onRunFinishedEvent:", params);
+  },
+
+  onRunErrorEvent(params) {
+    console.error("onRunErrorEvent:", params);
+  },
+
+  onStepStartedEvent(params) {
+    console.log("onStepStartedEvent:", params);
+  },
+
+  onStepFinishedEvent(params) {
+    console.log("onStepFinishedEvent:", params);
+  },
+}
+
+agent.subscribe(subscriber);
 
 const input =
   document.querySelector<HTMLInputElement>(
@@ -48,7 +102,7 @@ button.addEventListener(
     responseElement.style.display = "none";
     button.disabled = true;
 
-    agent.messages.push({
+    agent.addMessage({
       id: crypto.randomUUID(),
       role: "user",
       content,
